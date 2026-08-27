@@ -27,7 +27,7 @@ img,video,canvas,svg{max-width:100%;max-height:100%}
   .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
   .slide:last-child{break-after:auto;page-break-after:auto}
   .deck-controls{display:none!important}
-  .deck-index,.deck-edge,.laser{display:none!important}
+  .deck-index,.deck-edge{display:none!important}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
 
@@ -502,11 +502,10 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
 .contrib .sub{margin-top:15px;font-size:23px;line-height:1.42;color:var(--ink-faint)}
 
 /* ============================================================
-   PRESENTER TOOLS — index panel and laser pointer.
-   Both live OUTSIDE .deck-stage. The stage carries a transform:scale(), so
-   anything inside it inherits that scale; keeping these fixed to the viewport
-   means the panel stays legible at any window size and the laser can work in
-   plain client coordinates with no inverse transform to get wrong.
+   PRESENTER TOOLS — index panel.
+   Lives OUTSIDE .deck-stage. The stage carries a transform:scale(), so
+   anything inside it inherits that scale; keeping this fixed to the viewport
+   means the panel stays legible at any window size.
    ============================================================ */
 .deck-index{
   position:fixed;left:0;top:0;bottom:0;width:406px;z-index:1200;
@@ -548,11 +547,6 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
    screen edge — no need to remember the shortcut mid-talk. */
 .deck-edge{position:fixed;left:0;top:0;bottom:0;width:20px;z-index:1150}
 
-/* Full-viewport canvas. pointer-events:none is essential: the deck advances on
-   click, and an overlay that swallowed clicks would break navigation. */
-.laser{position:fixed;inset:0;z-index:1100;pointer-events:none;display:none}
-.laser.on{display:block}
-
 /* --- reveal --- */
 .r{opacity:0;transform:translateY(22px)}
 .slide.active .r{animation:rise .9s cubic-bezier(.16,1,.3,1) forwards}
@@ -583,7 +577,7 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
 </head>
 <body>
 <div class="progress" id="prog"></div>
-<div class="hint" id="hint">← → advance　·　M contents　·　L laser</div>
+<div class="hint" id="hint">← → advance　·　M contents</div>
 
 <div class="deck-viewport">
 <div class="deck-stage">
@@ -1720,7 +1714,8 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
   <div class="figwrap r d1"><img src="images/ParaManager-figure-1-system-overview.png" alt="ParaManager parallel orchestration"></div>
   <ul class="pts tight r d3" style="flex:0 0 auto;border-top:2px solid var(--ink);padding-top:14px;margin-top:8px">
     <li>One turn, up to <b>four</b> concurrent calls.</li>
-    <li>Three tiers — <b>8 tool IDs + 3 backbone models, all hard-coded.</b></li>
+    <li>Three tiers — <b>7 tools (2 basic + 5 agent) + 3 backbone models, all hard-coded.</b>
+      <em>final_answer is a separate terminate action, not one of the 7.</em></li>
     <li><code>search</code> is a <b>local Wikipedia retriever</b>, <em>not web search.</em></li>
   </ul>
 </section>
@@ -1739,9 +1734,85 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
   <div class="head"><span>ParaManager · Training</span><span>Figure 2 · SFT then RL</span></div>
   <div class="figwrap r d1"><img src="images/ParaManager-figure-2-training-pipeline.png" alt="Two-stage training pipeline"></div>
   <div class="takeaway r d3">SFT keeps <q>recoverable error trajectories</q> — runs that hit EXEC_ERR or
-    TIMEOUT and <b>repaired themselves</b> — and masks the loss to its own tokens:
-    <span class="eq" style="font-size:26px">ℒ<sub>SFT</sub> = −𝔼<sub>τ</sub> Σ<sub>ℓ</sub> <span class="hl"><i>m</i><sub>ℓ</sub></span> log π<sub>θ</sub>(<i>y</i><sub>ℓ</sub>|<i>y</i><sub>&lt;ℓ</sub>)</span>.
-    <em>4,470 SFT problems and 3,742 RL problems, drawn from DAPO-Math and kept disjoint.</em></div>
+    TIMEOUT and <b>repaired themselves</b> — rather than only ever showing a clean first-try success.
+    <em>Where the data comes from, and what the loss actually optimises — next two pages.</em></div>
+</section>
+
+<!-- ============ 31b · §4.2 DATA PROVENANCE ============ -->
+<section class="slide">
+  <div class="head"><span>ParaManager · Training</span><span>§4.2 · Where the data comes from</span></div>
+  <h2 class="r d1" style="margin-bottom:20px">One well, two buckets — <em>kept strictly apart.</em></h2>
+  <div class="cols">
+    <div class="col r d3">
+      <div class="lbl">SFT Data</div>
+      <ul class="pts tight" style="margin-top:6px">
+        <li>Runs <b>the framework itself</b> (Qwen3-30B-A3B-Instruct-2507) on DAPO-Math — <em>not hand-labeled.</em></li>
+        <li>Sample eight, keep <b>at most one</b> — prioritise the run that <b>recovers from a tool failure.</b></li>
+        <li>A <b>tool-balance</b> constraint stops one tool from dominating the retained set.</li>
+      </ul>
+      <p style="margin-top:22px;font-family:'JetBrains Mono',monospace;font-size:21px;color:var(--ink)">→ 4,470 instances</p>
+    </div>
+    <div class="col r d5">
+      <div class="lbl">RL Data</div>
+      <ul class="pts tight" style="margin-top:6px">
+        <li>Same DAPO-Math pool — <em>no separate source.</em></li>
+        <li>Sample <b>eight</b> outputs per question with the same model.</li>
+        <li><b>Discard</b> all-correct / all-incorrect questions — zero variance, zero signal.</li>
+      </ul>
+      <p style="margin-top:22px;font-family:'JetBrains Mono',monospace;font-size:21px;color:var(--ink)">→ 3,742 instances</p>
+    </div>
+  </div>
+  <div class="takeaway r d6" style="border-top-width:1px">Any question already used for RL is <b>removed</b>
+    before building the SFT set. <em>Stated leakage control, not an accident of how the split fell.</em></div>
+</section>
+
+<!-- ============ 31c · MASKED SFT LOSS ============ -->
+<section class="slide">
+  <div class="head"><span>ParaManager · Training</span><span>Eq. 9 · What the mask actually buys</span></div>
+  <div class="eqlist" style="gap:20px;flex:0 0 auto;margin-bottom:18px">
+    <div class="eqrow r d1">
+      <div class="tag">Loss</div>
+      <div class="body">
+        <div class="eq" style="font-size:32px">ℒ<sub>SFT</sub>(θ) = −𝔼<sub>τ</sub> Σ<sub>ℓ</sub> <span class="hl"><i>m</i><sub>ℓ</sub></span> log π<sub>θ</sub>( <i>y</i><sub>ℓ</sub> | <i>y</i><sub>&lt;ℓ</sub> )</div>
+        <div class="gloss">Ordinary next-token negative log-likelihood — <b>with one twist: the mask <i>m</i><sub>ℓ</sub>.</b></div>
+      </div>
+    </div>
+    <div class="eqrow r d2">
+      <div class="tag">The mask</div>
+      <div class="body">
+        <div class="eq" style="font-size:32px"><i>m</i><sub>ℓ</sub> = 1 iff token ∈ <i>r</i><sub>t</sub> or <i>a</i><sub>t</sub><span class="op">,</span> else <span class="hl">0</span></div>
+        <div class="gloss">1 on ParaManager’s own reasoning and action tokens. <b>0 on every environment-side token.</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- the mask made concrete: one real round from the paper's own Case study 1 (Figure 7) -->
+  <div class="wo r d4">
+    <div class="wo-hd">
+      <span>One round, linearised — which tokens the loss actually sees</span>
+      <span>Case study 1 · full exchange at p51</span>
+    </div>
+    <div class="wo-row">
+      <div class="wo-k"><i>r</i><sub>t</sub> reasoning</div>
+      <div class="wo-v"><em>counted</em> — “…the code_reasoner output says the sum is 55… but we must verify the
+        binary representation and the logic using independent tools.”</div>
+    </div>
+    <div class="wo-row">
+      <div class="wo-k"><i>a</i><sub>t</sub> action</div>
+      <div class="wo-v"><em>counted</em> — <code>{"name":"code_reasoner",…}</code> <code>{"name":"critical_reviewer",…}</code></div>
+    </div>
+    <div class="wo-row">
+      <div class="wo-k"><i>o</i><sub>t</sub> observation</div>
+      <div class="wo-v" style="color:var(--ink-faint)">masked out — critical_reviewer replies: “…every assumption is
+        justified… the final answer 55 is indeed correct.” Whatever the tool says back, <i>m</i><sub>ℓ</sub> = 0.</div>
+    </div>
+    <div class="wo-foot">Two rows train the policy. <b>The third only ever conditions it.</b></div>
+  </div>
+
+  <div class="takeaway r d6" style="border-top-width:1px"><q>Focuses SFT on the generation rules of orchestration
+    policies rather than fitting environment-side tool outputs.</q>
+    <em>Not maths — format, call-count, when to stop. And the same mask resurfaces in RL’s importance ratio
+    (Eq. 20) — not an SFT-only trick.</em></div>
 </section>
 
 <!-- ============ · FOUR REWARDS ============ -->
@@ -1750,12 +1821,16 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
   <h2 class="r d1" style="font-family:'JetBrains Mono',monospace;font-size:46px;font-weight:500">
     R(τ) = R<sub>task</sub> + R<sub>fmt</sub> + R<sub>div</sub> + R<sub>eff</sub></h2>
   <table class="r d3" style="margin-top:26px">
-    <thead><tr><th style="width:190px">Term</th><th style="width:420px">Checks</th><th>What it prevents</th></tr></thead>
+    <thead><tr><th style="width:560px">Term</th><th style="width:400px">Checks</th><th>What it prevents</th></tr></thead>
     <tbody>
-      <tr><td class="eq" style="font-size:26px">R<sub>task</sub> = 𝟙[ <i>ẑ</i> = GT(<i>q</i>) ]</td><td>Is the final answer right?</td><td>— the base objective, binary</td></tr>
+      <tr><td class="eq" style="font-size:26px">R<sub>task</sub> = 𝕀[ <i>ẑ</i> = GT(<i>q</i>) ]</td><td>Is the final answer right?</td><td>— the base objective, binary</td></tr>
       <tr><td class="eq" style="font-size:26px">R<sub>fmt</sub> = <span class="frac" style="font-size:.7em"><span>1</span><span>T</span></span> Σ<sub>t</sub> Fmt(<i>y</i><sub>t</sub>)</td><td>Valid <code>&lt;reasoning&gt;</code> / <code>&lt;tool_call&gt;</code> each turn?</td><td>Malformed output that can’t execute at all</td></tr>
-      <tr><td class="eq" style="font-size:26px">R<sub>div</sub> = ½( R<sub>par</sub> + R<sub>tool</sub> )</td><td>Really parallelising, and using more than one kind of tool?</td><td><span class="no">Path collapse</span> — settling on one safe tool forever</td></tr>
-      <tr><td class="eq" style="font-size:26px">R<sub>eff</sub> = ½( R<sub>len</sub> + R<sub>cost</sub> )</td><td>Tokens and tool spend inside budget?</td><td>Rambling and tool-spamming with nothing to show</td></tr>
+      <tr><td class="eq" style="font-size:26px">R<sub>div</sub> = ½( R<sub>par</sub> + R<sub>tool</sub> )
+          <div style="font-size:19px;margin-top:8px;font-weight:300;color:var(--ink-soft)">R<sub>par</sub> = 𝕀[ (1/T)Σ<sub>t</sub> <i>n</i><sub>t</sub> ≥ θ<sub>par</sub> ]&nbsp;&nbsp;&nbsp;R<sub>tool</sub> = 𝕀[ |U(τ)| ≥ θ<sub>tool</sub> ]</div></td>
+        <td>Really parallelising, and using more than one kind of tool?</td><td><span class="no">Path collapse</span> — settling on one safe tool forever</td></tr>
+      <tr><td class="eq" style="font-size:26px">R<sub>eff</sub> = ½( R<sub>len</sub> + R<sub>cost</sub> )
+          <div style="font-size:19px;margin-top:8px;font-weight:300;color:var(--ink-soft)">R<sub>len</sub>, R<sub>cost</sub> = 1 if <i>x</i> ≤ target, else max(0, (2·target−<i>x</i>)/target)</div></td>
+        <td>Tokens and tool spend inside budget?</td><td>Rambling and tool-spamming with nothing to show</td></tr>
     </tbody>
   </table>
   <p class="tbl-note r d5">Efficiency uses a <b>soft budget</b> — full marks under target, linear decay past it,
@@ -1882,7 +1957,11 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
   <div class="head"><span>ParaManager · Results</span><span>Table 1 · Eight benchmarks · mean@8</span></div>
   <div class="figwrap r d1"><img src="images/ParaManager-table-1-main-results.png" alt="Main results table: accuracy under mean@8 across four in-domain math benchmarks and four out-of-domain benchmarks"></div>
   <ul class="pts tight r d3" style="flex:0 0 auto;border-top:2px solid var(--ink);padding-top:14px;margin-top:8px">
-    <li>Trained on <b>maths only</b> — AIME24/25, AMC, HMMT25. GPQA, MMLU-pro, LiveCodeBench are <b>zero-shot.</b></li>
+    <li><b>Same frozen checkpoint, four test-time strategies</b> — Base (one shot) / Base+Tool (one shot, tools on) /
+      Majority Vote (8 samples, vote) / Self-Refine (critiques and revises its own answer, Madaan et al. 2023).
+      <em>No extra training in any of the four rows.</em></li>
+    <li>Trained on <b>maths only</b> — AIME24/25, AMC, HMMT25. GPQA, MMLU-pro, LiveCodeBench are the paper's own
+      <b>out-of-domain</b> set — zero-shot relative to training.</li>
     <li>Ablations: <b>no RL −7.05 · single-model pool −4.94 · no parallelism −4.00</b> (AVG points).</li>
   </ul>
 </section>
@@ -1914,19 +1993,20 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
 
 <!-- ============ · WHERE IT DOESN'T WIN ============ -->
 <section class="slide">
-  <div class="head"><span>ParaManager · Results</span><span>Where it doesn’t win</span></div>
-  <h2 class="r d1">The parts the paper phrases <em>gently</em></h2>
+  <div class="head"><span>ParaManager · Results</span><span>The out-of-domain ledger, in points</span></div>
+  <h2 class="r d1">Real wins, thin margins — <em>and it doesn’t win everywhere</em></h2>
   <table class="r d3" style="margin-top:26px">
-    <thead><tr><th style="width:330px">Benchmark</th><th style="width:260px">ParaManager</th><th>Beaten by</th></tr></thead>
+    <thead><tr><th style="width:290px">Benchmark</th><th style="width:190px">ParaManager</th><th style="width:400px">Runner-up (2nd best)</th><th>Margin</th></tr></thead>
     <tbody>
-      <tr><td>GPQA</td><td><span class="yes">72.10 — best</span></td><td>—</td></tr>
-      <tr><td>MMLU-pro</td><td><span class="yes">81.43 — best</span></td><td>—</td></tr>
-      <tr><td>LiveCodeBench v5</td><td>39.45</td><td><span class="no">Qwen3-30B Base+Tool · 39.76</span></td></tr>
-      <tr><td>LiveCodeBench v6</td><td>41.51</td><td><span class="no">Qwen3-30B Self-Refine · 43.25</span></td></tr>
+      <tr><td>GPQA</td><td><span class="yes">72.10 — best</span></td><td>GPT-OSS-20B · Majority Vote · 71.21</td><td><span class="yes">+0.89</span></td></tr>
+      <tr><td>MMLU-pro</td><td><span class="yes">81.43 — best</span></td><td>Puppeteer · 80.54</td><td><span class="yes">+0.89</span></td></tr>
+      <tr><td>LiveCodeBench v5</td><td>39.45</td><td>Qwen3-30B Base+Tool · 39.76</td><td><span class="no">−0.31</span></td></tr>
+      <tr><td>LiveCodeBench v6</td><td>41.51</td><td>Qwen3-30B Self-Refine · 43.25</td><td><span class="no">−1.74</span></td></tr>
     </tbody>
   </table>
-  <p class="tbl-note r d5">The paper says only “remains competitive.” <b>The honest version of the zero-shot
-    story: knowledge and science transfer, <em>code does not.</em></b></p>
+  <p class="tbl-note r d5">Both wins are real, but neither is wide — <b>+0.89 over the runner-up, both times.</b>
+    And on MMLU-pro, <b>ParaManager-SFT alone already scores 81.43</b> — <em>the entire out-of-domain gain there
+    predates RL.</em> The paper says only “remains competitive” about the two it loses.</p>
 </section>
 
 <!-- ============ 38c · TABLE 2 · EFFICIENCY ============ -->
@@ -2031,8 +2111,9 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
       <b>verifiable answers.</b> <em>For a report or a judgment call, what is the reward?</em></div></div>
     <div class="three-row r d4"><div class="num">2</div><div class="txt"><b>No cross-seed variance</b> in
       either paper. <em>The stability of the gains is unknown.</em></div></div>
-    <div class="three-row r d5"><div class="num">3</div><div class="txt">SWE-Bench issues come from public
-      GitHub — <b>contamination is a live concern.</b> <em>Keep the relative comparison.</em></div></div>
+    <div class="three-row r d5"><div class="num">3</div><div class="txt"><b>Public-source data is a live concern
+      for both</b> — SWE-Bench issues from GitHub, DAPO-Math vs the competition-math test sets.
+      <em>Keep the relative comparison, discount the absolute number.</em></div></div>
   </div>
 </section>
 
@@ -2085,10 +2166,9 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
 
 </div>
 
-<canvas class="laser" id="laser"></canvas>
 <div class="deck-edge" id="edge"></div>
 <nav class="deck-index" id="index">
-  <header><span>Contents</span><span><b>M</b> toggle　·　<b>L</b> laser</span></header>
+  <header><span>Contents</span><span><b>M</b> toggle</span></header>
   <div class="list" id="indexList"></div>
 </nav>
 </div>
@@ -2099,7 +2179,6 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
    2. Auto-shrink any slide whose content exceeds the stage
    3. Navigation: arrows, space, click, swipe
    4. Contents panel (M / left edge)
-   5. Laser pointer with fading trail (L)
    ============================================================ */
 (function(){
   var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
@@ -2238,71 +2317,9 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
   /* clicks inside the panel must never reach the click-to-advance handler */
   panel.addEventListener('click', function(e){ e.stopPropagation(); });
 
-  /* --- 5. laser pointer -------------------------------------------------
-     Off by default: with a clicker there is no mouse movement at all, and a
-     dot parked in a corner would just be a distraction. --------------- */
-  var cv = document.getElementById('laser'), ctx = cv.getContext('2d');
-  var pts = [], laserOn = false, raf = null;
-  var TAIL = 460;                       /* ms a point stays visible */
-  var still = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-
-  function sizeCanvas(){
-    var d = window.devicePixelRatio || 1;
-    cv.width = innerWidth*d; cv.height = innerHeight*d;
-    cv.style.width = innerWidth+'px'; cv.style.height = innerHeight+'px';
-    ctx.setTransform(d,0,0,d,0,0);
-  }
-  function draw(){
-    var now = performance.now();
-    while(pts.length && now - pts[0].t > TAIL) pts.shift();
-    ctx.clearRect(0,0,innerWidth,innerHeight);
-
-    /* the trail: one segment per pair, faded and thinned by age */
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    for(var i=1;i<pts.length;i++){
-      var age = (now - pts[i].t) / TAIL;
-      var k = 1 - age;                                  /* 1 = newest */
-      ctx.strokeStyle = 'rgba(226,48,30,'+(k*k*0.72).toFixed(3)+')';
-      ctx.lineWidth = 2 + k*7;
-      ctx.beginPath();
-      ctx.moveTo(pts[i-1].x, pts[i-1].y);
-      ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.stroke();
-    }
-    /* the head: a hot core inside a soft halo */
-    var p = pts[pts.length-1];
-    if(p && now - p.t < 2600){
-      var g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,26);
-      g.addColorStop(0,'rgba(255,120,100,.95)');
-      g.addColorStop(.28,'rgba(226,48,30,.55)');
-      g.addColorStop(1,'rgba(226,48,30,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(p.x,p.y,26,0,6.284); ctx.fill();
-      ctx.fillStyle = 'rgba(255,238,232,.98)';
-      ctx.beginPath(); ctx.arc(p.x,p.y,3.6,0,6.284); ctx.fill();
-    }
-    raf = laserOn ? requestAnimationFrame(draw) : null;
-  }
-  function kick(){ if(laserOn && raf === null) raf = requestAnimationFrame(draw); }
-  addEventListener('mousemove', function(e){
-    if(!laserOn) return;
-    pts.push({x:e.clientX, y:e.clientY, t:performance.now()});
-    if(pts.length > 140) pts.shift();
-    kick();
-  });
-  function toggleLaser(){
-    laserOn = !laserOn;
-    cv.classList.toggle('on', laserOn);
-    document.body.style.cursor = laserOn ? 'none' : '';
-    if(laserOn){ sizeCanvas(); kick(); }
-    else { pts = []; if(raf){ cancelAnimationFrame(raf); raf = null; } ctx.clearRect(0,0,innerWidth,innerHeight); }
-  }
-  addEventListener('resize', function(){ if(laserOn) sizeCanvas(); });
-
   addEventListener('keydown', function(e){
     var k = e.key.toLowerCase();
     if(k==='m'){ e.preventDefault(); togglePanel(); return; }
-    if(k==='l' && !still){ e.preventDefault(); toggleLaser(); return; }
     if(e.key==='Escape'){ closePanel(); return; }
     if(e.key==='ArrowRight' || e.key===' ' || e.key==='PageDown'){ e.preventDefault(); next(); }
     else if(e.key==='ArrowLeft' || e.key==='PageUp'){ e.preventDefault(); prev(); }
