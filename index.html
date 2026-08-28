@@ -1364,9 +1364,16 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
 <section class="slide">
   <div class="head"><span>AOrchestra · Setup</span><span>Table 6 · Tools and hard limits</span></div>
   <div class="figwrap r d1"><img src="images/AORCHESTRA-table-6-tool-inventory.png" alt="Tool inventory and constraints per benchmark"></div>
-  <div class="takeaway r d3">Each benchmark hands sub-agents a different toolset — and the timeouts are
-    brutal: <b>10 s for code, 30 s for search, 300 s for SWE-Bench tests.</b>
-    <em>These numbers bound how much any single step can achieve.</em></div>
+  <ul class="pts tight r d3" style="flex:0 0 auto;border-top:2px solid var(--ink);padding-top:14px;margin-top:8px">
+    <li>Each benchmark hands sub-agents a different toolset — and the timeouts are brutal:
+      <b>10 s for code, 30 s for search, 300 s for SWE-Bench tests</b> (Appendix D). <em>These bound how much
+      any single step can achieve.</em></li>
+    <li>GAIA gets <b>five</b> tools; Terminal-Bench gets <b>one</b> (<code>execute</code>) — and its own prompt
+      warns <q>each SubAgent runs in a FRESH container; if you delegate_task again, the previous work will be
+      lost.</q> <em>That’s why <code>finish</code> and <code>submit</code> are separate actions — the sub-agent
+      reporting “done” and the orchestrator deciding to lock it in and grade it are two different calls, on
+      purpose.</em></li>
+  </ul>
 </section>
 
 <!-- ============ · CASE STUDY 1/3 — the feedback loop corrects an error ============ -->
@@ -1389,6 +1396,7 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
       <div class="hd"><span>Attempt 1 — the guess</span><em>abridged</em></div>
       <div class="js">{
   <span class="k">"action"</span><span class="p">:</span> <i>"delegate_task"</i><span class="p">,</span>
+  <span class="k">"reasoning"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
   <span class="k">"params"</span><span class="p">: {</span>
     <span class="k">"task_instruction"</span><span class="p">:</span> <span class="p">"…</span> 3. Inspect the twelve
       figures, <b>e.g. accession numbers 1975.1.784
@@ -1396,7 +1404,8 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
     <span class="k">"context"</span><span class="p">:</span> <span class="p">"</span>2015 is the year of the Ram.
       The exhibition <b>may be called</b> 'Celebrating
       the Year of the Ram'<span class="p">. …",</span>
-    <span class="k">"model"</span><span class="p">:</span> <i>"model_1"</i>
+    <span class="k">"model"</span><span class="p">:</span> <i>"model_1"</i><span class="p">,</span>
+    <span class="k">"tools"</span><span class="p">:</span> <span class="p">[…]</span>
   <span class="p">}</span>
 }</div>
     </div>
@@ -1409,10 +1418,13 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
     failed on <b>wrong accession numbers</b> and a
     tool failure<span class="p">. …",</span>
   <span class="k">"params"</span><span class="p">: {</span>
+    <span class="k">"task_instruction"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
     <span class="k">"context"</span><span class="p">:</span> <span class="p">"…</span> <b>Do not use
       1975.1.784-795, they are unrelated
       sketches.</b> A previous attempt indicates
-      <i>02.18.730a-l</i><span class="p">. …"</span>
+      <i>02.18.730a-l</i><span class="p">. …",</span>
+    <span class="k">"model"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
+    <span class="k">"tools"</span><span class="p">:</span> <span class="p">[…]</span>
   <span class="p">}</span>
 }</div>
     </div>
@@ -1431,6 +1443,7 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
       <div class="hd"><span>Attempt 5 — then it timed out</span><em>abridged</em></div>
       <div class="js">{
   <span class="k">"action"</span><span class="p">:</span> <i>"delegate_task"</i><span class="p">,</span>
+  <span class="k">"reasoning"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
   <span class="k">"params"</span><span class="p">: {</span>
     <span class="k">"task_instruction"</span><span class="p">:</span> <span class="p">"</span>1. Open accession
       <i>02.18.730</i> (<i>Object ID 42102</i>) and
@@ -1440,7 +1453,9 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
     <span class="k">"context"</span><span class="p">:</span> <span class="p">"…</span> use high-resolution
       images such as <i>DT5058.jpg</i>; check rat, ox,
       tiger, rabbit, dragon, snake, horse, goat,
-      monkey, rooster, dog, pig<span class="p">. …"</span>
+      monkey, rooster, dog, pig<span class="p">. …",</span>
+    <span class="k">"model"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
+    <span class="k">"tools"</span><span class="p">:</span> <span class="p">[…]</span>
   <span class="p">}</span>
 }</div>
     </div>
@@ -1452,9 +1467,12 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
     that the snake (02.18.730f) has its hands
     hidden in its sleeves</b><span class="p">. …",</span>
   <span class="k">"params"</span><span class="p">: {</span>
+    <span class="k">"task_instruction"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
     <span class="k">"context"</span><span class="p">:</span> <span class="p">"…</span> <b>Previous analysis shows
       the snake (02.18.730f) has its hands hidden
-      in its sleeves</b><span class="p">. …"</span>
+      in its sleeves</b><span class="p">. …",</span>
+    <span class="k">"model"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
+    <span class="k">"tools"</span><span class="p">:</span> <span class="p">[…]</span>
   <span class="p">}</span>
 }</div>
     </div>
@@ -1479,7 +1497,12 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
     suggests the answer is 11.</b> But 'visible
     hands' means fingers, <b>not an animal's paw</b> —
     I need a final check on monkey, dog, pig<span class="p">. …",</span>
-  <span class="k">"params"</span><span class="p">: {</span> <span class="p">…</span> <span class="p">}</span>
+  <span class="k">"params"</span><span class="p">: {</span>
+    <span class="k">"task_instruction"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
+    <span class="k">"context"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
+    <span class="k">"model"</span><span class="p">:</span> <span class="p">"…"</span><span class="p">,</span>
+    <span class="k">"tools"</span><span class="p">:</span> <span class="p">[…]</span>
+  <span class="p">}</span>
 }</div>
     </div>
     <div class="jsw r d4">
@@ -1686,16 +1709,21 @@ table.compact tbody td{padding:12px 16px 12px 0;line-height:1.3}
       <div class="tag">Action</div>
       <div class="body">
         <div class="eq"><i>a</i><sub>t</sub> <span class="op">=</span> { ( <i>k</i><sub>t,j</sub><span class="op">,</span> <i>p</i><sub>t,j</sub> ) }<sub>j=1..n<sub>t</sub></sub><span class="op">,</span>
-          <span class="hl">1 ≤ <i>n</i><sub>t</sub> ≤ <i>n</i><sub>max</sub> = 4</span></div>
-        <div class="gloss">A <b>set</b>, not a single call. <em>This one line is the whole paper.</em></div>
+          <span class="hl">1 ≤ <i>n</i><sub>t</sub> ≤ <i>n</i><sub>max</sub> = 4</span><span class="op">,</span>
+          <span class="hl"><i>k</i><sub>t,j</sub> ∈ { 1<span class="op">,</span> …<span class="op">,</span> <i>N</i>=7 }</span></div>
+        <div class="gloss">A <b>set</b>, not a single call — <b>and each call’s <i>k</i> is an index into the
+          fixed 7-tool pool</b> (p39), not a freshly-assembled worker. <em>This one line is the whole paper.</em></div>
       </div>
     </div>
     <div class="eqrow r d4">
       <div class="tag">Executor</div>
       <div class="body">
-        <div class="eq"><i>o</i><sub>t,j</sub> <span class="op">=</span> <i>T</i><sub>k</sub>( <i>p</i> ) if ν<sub>t,j</sub> = 1<span class="op">,</span>
+        <div class="eq" style="font-size:32px">ν<sub>t,j</sub> <span class="op">≜</span> Valid( <i>k</i><sub>t,j</sub><span class="op">,</span> <i>p</i><sub>t,j</sub> ) <span class="op">∈</span> <span class="set">{0, 1}</span></div>
+        <div class="eq" style="margin-top:10px"><i>o</i><sub>t,j</sub> <span class="op">=</span> <i>T</i><sub>k</sub>( <i>p</i> ) if ν<sub>t,j</sub> = 1<span class="op">,</span>
           else ( ∅<span class="op">,</span> <span class="set">PARSE_ERR</span> )</div>
-        <div class="gloss">Each call is validated independently. <b>One bad call in a parallel batch doesn’t sink the other three.</b></div>
+        <div class="gloss">ν<sub>t,j</sub> isn’t assumed — <b>it’s the output of a validity checker</b> run on that exact call
+          first. Only then does a valid call actually execute; <b>each call is checked and run independently.</b>
+          <em>One bad call in a parallel batch doesn’t sink the other three.</em></div>
       </div>
     </div>
     <div class="eqrow r d5">
